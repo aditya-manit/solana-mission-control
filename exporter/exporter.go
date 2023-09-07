@@ -45,6 +45,7 @@ type solanaCollector struct {
 	voteHeightDiff            *prometheus.Desc
 	valVotingStatus           *prometheus.Desc
 	voteCredits               *prometheus.Desc
+	voteCreditsCounter        *prometheus.Desc
 	networkConfirmationTime   *prometheus.Desc
 	validatorConfirmationTime *prometheus.Desc
 	confirmationTimeDiff      *prometheus.Desc
@@ -158,6 +159,11 @@ func NewSolanaCollector(cfg *config.Config) *solanaCollector {
 			"solana_vote_credits",
 			"solana validator vote credits of previous and current epoch.",
 			[]string{"solana_current_credits", "solana_previous_credits"}, nil,
+		),
+		voteCreditsCounter: prometheus.NewDesc(
+			"solana_current_epoch_vote_credits",
+			"Counter metric for solana validator vote credits.",
+			nil, nil,
 		),
 		networkBlockTime: prometheus.NewDesc(
 			"solana_network_confirmed_time",
@@ -287,9 +293,9 @@ func (c *solanaCollector) mustEmitMetrics(ch chan<- prometheus.Metric, response 
 			ch <- prometheus.MustNewConstMetric(c.voteHeightDiff, prometheus.GaugeValue, diff, "vote height difference")
 
 			// calcualte vote credits
-			cCredits, pCredits := c.calcualteEpochVoteCredits(vote.EpochCredits)
+			cCredits, pCredits, currentFloatCredits := c.calcualteEpochVoteCredits(vote.EpochCredits)
 			ch <- prometheus.MustNewConstMetric(c.voteCredits, prometheus.GaugeValue, 1, cCredits, pCredits)
-
+			ch <- prometheus.MustNewConstMetric(c.voteCreditsCounter, prometheus.CounterValue, float64(currentFloatCredits))
 		}
 	}
 
@@ -326,7 +332,7 @@ func (c *solanaCollector) mustEmitMetrics(ch chan<- prometheus.Metric, response 
 }
 
 // calculateEpochVoteCredits returns epoch credits of vote account
-func (c *solanaCollector) calcualteEpochVoteCredits(credits [][]int64) (string, string) {
+func (c *solanaCollector) calcualteEpochVoteCredits(credits [][]int64) (string, string, int64) {
 	epochInfo, err := monitor.GetEpochInfo(c.config, utils.Validator)
 	if err != nil {
 		log.Printf("Error while getting epoch info : %v", err)
@@ -349,7 +355,7 @@ func (c *solanaCollector) calcualteEpochVoteCredits(credits [][]int64) (string, 
 	cCredits := strconv.FormatInt(currentCredits, 10)
 	pCredits := strconv.FormatInt(previousCredits, 10)
 
-	return cCredits, pCredits
+	return cCredits, pCredits, currentCredits
 }
 
 // AlertValidatorStatus sends validator status alerts at respective alert timings.
