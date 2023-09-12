@@ -37,12 +37,21 @@ func GetNodeHealth(cfg *config.Config) (float64, error) {
 
 	// send alert if node is down
 	if result.Result != "" {
-		if strings.EqualFold(result.Result, "ok") {
-			log.Printf("Node health : %s", result.Result)
-			h = 1
-
-			return h, nil
-		} else {
+		// Assuming 'result' is a struct that you've unmarshaled the JSON into
+        if strings.EqualFold(result.Result, "ok") || result.Error != nil {
+            if strings.EqualFold(result.Result, "ok") {
+                log.Printf("Node health : %s", result.Result)
+            } else {
+                log.Printf("Node error (%d): %s", result.Error.Code, result.Error.Message)
+                if data, ok := result.Error.Data.(map[string]interface{}); ok {
+                    if numSlotsBehind, exists := data["numSlotsBehind"]; exists {
+                        log.Printf("Node is behind by %d slots", numSlotsBehind)
+                    }
+                }
+            }
+            h = 1
+            return h, nil
+        } else {
 			if strings.EqualFold(cfg.AlerterPreferences.NodeHealthAlert, "yes") {
 				err = alerter.SendTelegramAlert(fmt.Sprintf("Your node is not running"), cfg)
 				if err != nil {
