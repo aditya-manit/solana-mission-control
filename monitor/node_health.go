@@ -36,7 +36,7 @@ func GetNodeHealth(cfg *config.Config) (float64, error) {
 	}
 
 	// send alert if node is down
-	if result.Error != "" {
+	if result.Error.Message != "" {
 		if strings.EqualFold(result.Error.Message, "Node is unhealthy") {
 			log.Printf("Node health : %s", result.Result)
 			h = 0
